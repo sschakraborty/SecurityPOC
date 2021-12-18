@@ -148,6 +148,27 @@ Basically, everything that is needed for an attacker to send a JNDI injection pa
 
 That above payload will visit the directory server running in the ```directory.attacker-controlled-domain.com``` host and query for ```/foo/bar``` directory. The directory server might return a directory name which can be a valid URL pointing to a compiled class file - Example: ```http://class.attacker-controlled-domain.com/Exploit.class```. Then the Java lookup in Log4j will try to fetch that compiled class and load it in the JVM runtime. The any static code blocks will be executed instantly when the class is loaded and therefore might allow an attacker to create a bind or reverse shell to the host server.
 
+### Exploit PoC
+
+Follow the steps to get a PoC setup working. First step is to run a vulnerable web server:
+
+1. Clone this repo ```git clone https://github.com/sschakraborty/SecurityPOC.git```
+2. Change current directory into *log4shell* - ```cd log4shell```
+3. Build using Maven - ```mvn clean package -D skipTests```
+4. Run the vulnerable web server fat JAR - ```java -jar target/log4shell-1.0.0-SNAPSHOT-fat.jar```
+5. This web server will be listening on port ```8888``` and will be appending logs into two appenders. One appender is the console appender, which is vulnerable. The other one is the rolling file appender which is not vulnerable as ```%m{nolookups}``` in its configuration, disables the lookup feature.
+
+Second step is to run a directory server that understands LDAP protocol. This project has a ```directory_server.py``` file under ```exploit``` directory. It's a simple Python socket program that logs any incoming socket connection. That should be enough for a Security Engineer to understand and detect, if the vulnerable web server actually sent an LDAP query to the socket program.
+
+To run an actual dummy LDAP server, the project [Marshalsec](https://github.com/mbechler/marshalsec) by [Moritz Bechler](https://github.com/mbechler) can be used.
+
+To run the directory server and see the exploit in action:
+
+1. Run directory server using Python 3 - ```python3 exploit/directory_server.py```
+2. Run the exploit - ```python3 exploit/exploit.py```
+3. The vulnerable web server's console appender will evaluate the lookup meta-variables that were sent from the ```exploit.py``` file via HTTP requests.
+4. The last HTTP request in ```exploit.py```, which is a JNDI injection payload, should force the vulnerable web server to make an LDAP query to the directory server. The directory server should log an incoming connection from the vulnerable web server.
+
 
 ## Information Disclosure
 
@@ -155,9 +176,13 @@ Information disclosure can happen because of **Environment Lookup**.
 
 It is a common practice to specify secrets, passwords, passphrases and access keys using environment variables. For example, Dockerized applications can take in the access and secret keys to AWS environment using environment variables mentioned in the Dockerfile.
 
-Environment Lookup dumps environment variables in logs. For example ```${env:USER}``` will print the current ```$USER``` value in logs. Similarly ```${env:SESSION_MANAGER}``` and ```${env:AWS_SECRET_ACCESS_KEY}``` will dump ```$SESSION_MANAGER``` and ```$AWS_SECRET_ACCESS_KEY``` environment variables.
+Environment Lookup dumps environment variables in logs. For example ```${env:USER}``` will print the current ```$USER``` value in logs. Similarly ```${env:SESSION_MANAGER}``` and ```${env:AWS_SECRET_ACCESS_KEY}``` will dump ```$SESSION_MANAGER``` and ```$AWS_SECRET_ACCESS_KEY``` environment variables in logs.
 
-This will disclose secrets to anyone having access to logs as they might contain sensitive information in plaintext. If the logger is used with an appender that discloses information back to the attacker, then the attacker can openly read the values of all environment variables.
+This can disclose sensitive secrets in plaintext to anyone who has access to those logs. If the logger is used with an appender that discloses information back to the attacker, then the attacker can openly read the values of all environment variables.
+
+### Information Leakage using DNS Lookup
+
+
 
 
 # Remediation
