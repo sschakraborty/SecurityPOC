@@ -13,7 +13,7 @@ Understanding the above CVE is a pre-requisite to understanding these follow-up 
 
 The vulnerability is related to a Log4j 2 feature called *Lookups*. *Lookups* are available only in **Log4j 2** (version 2.x) and not in **Log4j** (version 1.x). For more information on *Lookups* visit [Log4j 2 Lookups](https://logging.apache.org/log4j/2.x/manual/lookups.html).
 
-```CVE-2021-45046``` was patched in Log4j version ```2.16.0``` by removing the lookup feature entirely. The bug [LOG4J2-3230](https://issues.apache.org/jira/browse/LOG4J2-3230) has been fixed in version ```2.17.0```.
+```CVE-2021-45046``` was patched in Log4j version ```2.16.0``` by removing the JNDI lookup feature entirely. The bug [LOG4J2-3230](https://issues.apache.org/jira/browse/LOG4J2-3230) has been fixed in version ```2.17.0```.
 
 It's recommended for Log4j core dependencies to be upgraded to versions ```2.17.0``` or above.
 
@@ -136,4 +136,4 @@ The next step is to simply execute the Python 3 exploit script as ```python3 exp
 
 Upgrade Log4j to a version ```2.17.0``` or above.
 
-The DoS vulnerability is solved in the Log4j version ```2.16.0``` by removing the lookup feature entirely. The call to resolve / evaluate the lookup meta-variables, has been removed. Therefore, Log4j version ```2.16.0``` or above will not resolve anything resembling ```${...}``` or ```$${...}```.
+The DoS vulnerability is solved in the Log4j version ```2.16.0``` by removing the JNDI lookup feature entirely. The call to resolve / evaluate the JNDI lookup meta-variables, has been removed. Therefore, Log4j version ```2.16.0``` or above will not resolve anything which resembles or which recursively resolves to resemble ```${jndi:...}``` or ```$${jndi:...}```.
