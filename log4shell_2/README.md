@@ -43,6 +43,12 @@ For complete background of the above discussions, see [Log4Shell RCE - CVE-2021-
 Consider the following Java code:
 
 ```java
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Promise;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
+
 public class MainVerticle extends AbstractVerticle {
     private static final Logger logger = LogManager.getLogger(MainVerticle.class);
 
@@ -121,7 +127,7 @@ Follow the steps to get a PoC setup working. First step is to run a vulnerable w
 
 The rolling file appender logs into ```target/rolling/rollingtest.log```.
 
-The next step is to simply execute the Python 3 exploit script as ```python3 exploit/exploit.py```. You should see that the server's thread is blocked forever and does not exit (The server will be logging warning for being blocked. This is a feature in Vert.x framework). The Python 3 client will exit after some time because of timeout but the server thread will continue to be blocked.
+The next step is to simply execute the Python 3 exploit script as ```python3 exploit/exploit.py```. You should see that the server's thread is blocked forever and does not exit (The server will be logging warnings for being blocked. This is a feature in Vert.x framework). The Python 3 client will exit after some time because of timeout but the server thread will continue to be blocked.
 
 **Note:** The blocked server cannot be terminated using ```Ctrl + C``` signal. Try ```sudo kill -9 <PID>```.
 
