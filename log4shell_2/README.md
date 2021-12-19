@@ -188,7 +188,7 @@ OpenJDK Runtime Environment 18.9 (build 11.0.13+8)
 OpenJDK 64-Bit Server VM 18.9 (build 11.0.13+8, mixed mode, sharing)
 ```
 
-As of 18th Dec, 2021, the impact of this CVE, for most Java applications running on modern JVM, is limited to pollution logs by dumping a stack trace. The application might still continue working fine. Investigations on the matter is ongoing. However, the Log4j version ```2.17.0``` addresses this issue effectively.
+As of 18th Dec, 2021, the impact of this CVE, for most Java applications running on modern JVM, is limited to polluting logs by dumping a stack trace. The application might still continue working fine. Investigation on the matter is ongoing. However, the Log4j version ```2.17.0``` addresses this issue effectively.
 
 
 # Remediation
