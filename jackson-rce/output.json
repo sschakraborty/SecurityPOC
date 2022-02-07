@@ -1,0 +1,8 @@
+{
+  "name" : "pWneD!",
+  "shape" : [ "com.pingidentity.exploits.beans.Rectangle", {
+    "name" : "Some Shape",
+    "firstSide" : 13.0,
+    "secondSide" : 47.0
+  } ]
+}
