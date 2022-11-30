@@ -1,0 +1,1 @@
+process.send(new Date().toString())
