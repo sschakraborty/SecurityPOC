@@ -1,5 +1,4 @@
-# SecurityPOC
-Security Research and POC
+# Security Research and PoC
 
 ## Log4Shell Analysis
 1. [Log4Shell](log4shell/) (CVE-2021-44228)
