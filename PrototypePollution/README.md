@@ -92,7 +92,7 @@ app.use((req, res, next) => {
 	const parsedJWT = JwtUtil.parse(req.headers.authorization)
 	const { hasAdminRole } = parsedJWT.permissions
 
-	if (hasAdminRole && satisfyPrivilegeCriteria(req)) {
+	if (hasAdminRole && satisfiesPrivilegeCriteria(req)) {
 		req.isAdmin = true
 	}
 	next()
@@ -109,7 +109,7 @@ app.use((req, res, next) => {
 	const { hasAdminRole } = parsedJWT.permissions
 
 	// Sets the isAdmin 'Own Property' in both true and false cases
-	req.isAdmin = hasAdminRole && satisfyPrivilegeCriteria(req)
+	req.isAdmin = hasAdminRole && satisfiesPrivilegeCriteria(req)
 	next()
 });
 
