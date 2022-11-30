@@ -348,9 +348,9 @@ object.__proto__.env = { RANDOM: 'console.log(123)//', NODE_OPTIONS: '--require 
 const { fork } = require('child_process');
 
 if (process.argv[2] == 'child') {
-        console.log('Hello from child!')
+    console.log('Hello from child!')
 } else {
-        fork(__filename, [ 'child' ]);
+    fork(__filename, [ 'child' ]);
 }
 
 //////// OUTPUT ////////
