@@ -28,7 +28,7 @@ public class MutualTLSVertxClient implements Client {
         final WebClient webClient = WebClient.create(vertx, options);
 
         webClient.get(9500, "localhost", "/").send().onSuccess(response -> {
-            System.out.println(response.bodyAsString());
+            System.out.println("Vertx mTLS Client: " + response.bodyAsString());
         });
     }
 }
